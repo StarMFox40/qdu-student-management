@@ -1,0 +1,228 @@
+-- 创建数据库（如不存在）
+CREATE DATABASE IF NOT EXISTS xueguan
+CHARACTER SET utf8mb4
+COLLATE utf8mb4_unicode_ci;
+
+USE xueguan;
+
+-- =====================================================
+-- 1. 用户表 (users)
+-- =====================================================
+CREATE TABLE users (
+    user_id INT AUTO_INCREMENT PRIMARY KEY COMMENT '用户ID',
+    username VARCHAR(50) NOT NULL UNIQUE COMMENT '登录名',
+    password_hash VARCHAR(255) NOT NULL COMMENT '密码哈希',
+    real_name VARCHAR(50) NOT NULL COMMENT '真实姓名',
+    department VARCHAR(100) COMMENT '所属部门',
+    phone VARCHAR(20) COMMENT '联系方式',
+    email VARCHAR(100) COMMENT '邮箱',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间'
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='用户表';
+
+-- =====================================================
+-- 2. 权限表 (permissions)
+-- =====================================================
+CREATE TABLE permissions (
+    permission_id INT AUTO_INCREMENT PRIMARY KEY COMMENT '权限ID',
+    permission_name VARCHAR(100) NOT NULL UNIQUE COMMENT '权限标识',
+    description VARCHAR(255) COMMENT '权限描述'
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='权限表';
+
+-- =====================================================
+-- 3. 用户权限关联表 (role_permissions) —— 直接为用户分配权限
+-- =====================================================
+CREATE TABLE role_permissions (
+    user_id INT NOT NULL COMMENT '用户ID',
+    permission_id INT NOT NULL COMMENT '权限ID',
+    PRIMARY KEY (user_id, permission_id),
+    FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE,
+    FOREIGN KEY (permission_id) REFERENCES permissions(permission_id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='用户权限关联表';
+
+-- =====================================================
+-- 4. 教师表 (teachers) —— 继承用户，扩展教师特有信息
+-- =====================================================
+CREATE TABLE teachers (
+    teacher_id INT AUTO_INCREMENT PRIMARY KEY COMMENT '教师ID',
+    user_id INT NOT NULL UNIQUE COMMENT '关联用户ID',
+    title VARCHAR(50) COMMENT '职称',
+    hire_date DATE COMMENT '入职日期',
+    probation_start DATE COMMENT '首聘期开始日期',
+    regular_date DATE COMMENT '转正日期',
+    hire_level VARCHAR(50) COMMENT '引进层次',
+    research_area VARCHAR(255) COMMENT '研究领域',
+    religion VARCHAR(50) COMMENT '宗教信仰',
+    FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='教师表';
+
+-- =====================================================
+-- 5. 课程表 (courses) —— 根据功能需求补充，用于教学任务关联
+-- =====================================================
+CREATE TABLE courses (
+    course_id INT AUTO_INCREMENT PRIMARY KEY COMMENT '课程ID',
+    course_name VARCHAR(200) NOT NULL COMMENT '课程名称',
+    course_code VARCHAR(50) UNIQUE COMMENT '课程编号',
+    credit DECIMAL(3,1) COMMENT '学分',
+    description TEXT COMMENT '课程描述'
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='课程表';
+
+-- =====================================================
+-- 6. 科研项目表 (research_projects)
+-- =====================================================
+CREATE TABLE research_projects (
+    project_id INT AUTO_INCREMENT PRIMARY KEY COMMENT '项目ID',
+    project_name VARCHAR(200) NOT NULL COMMENT '项目名称',
+    leader_id INT COMMENT '负责人ID',
+    start_date DATE COMMENT '开始日期',
+    end_date DATE COMMENT '结束日期',
+    funding DECIMAL(12,2) COMMENT '经费',
+    description TEXT COMMENT '项目描述',
+    FOREIGN KEY (leader_id) REFERENCES teachers(teacher_id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='科研项目表';
+
+-- =====================================================
+-- 7. 论文成果表 (papers)
+-- =====================================================
+CREATE TABLE papers (
+    paper_id INT AUTO_INCREMENT PRIMARY KEY COMMENT '论文ID',
+    paper_name VARCHAR(200) NOT NULL COMMENT '论文名称',
+    journal VARCHAR(200) COMMENT '发表期刊',
+    publish_date DATE COMMENT '发表日期',
+    project_id INT COMMENT '关联项目ID（可选）',
+    teacher_id INT COMMENT '作者教师ID',
+    remarks TEXT COMMENT '备注',
+    index_type VARCHAR(50) COMMENT '收录类型（SCI/EI/核心等）',
+    FOREIGN KEY (project_id) REFERENCES research_projects(project_id) ON DELETE SET NULL,
+    FOREIGN KEY (teacher_id) REFERENCES teachers(teacher_id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='论文成果表';
+
+-- =====================================================
+-- 8. 教学任务表 (teaching_tasks)
+-- =====================================================
+CREATE TABLE teaching_tasks (
+    task_id INT AUTO_INCREMENT PRIMARY KEY COMMENT '任务ID',
+    course_id INT COMMENT '课程ID',
+    teacher_id INT COMMENT '教师ID',
+    semester VARCHAR(20) COMMENT '学期',
+    class_time VARCHAR(200) COMMENT '授课时间（如周一3-4节）',
+    classroom VARCHAR(50) COMMENT '教室',
+    FOREIGN KEY (course_id) REFERENCES courses(course_id) ON DELETE CASCADE,
+    FOREIGN KEY (teacher_id) REFERENCES teachers(teacher_id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='教学任务表';
+
+-- =====================================================
+-- 9. 业绩记录表 (achievements)
+-- =====================================================
+CREATE TABLE achievements (
+    achievement_id INT AUTO_INCREMENT PRIMARY KEY COMMENT '业绩ID',
+    teacher_id INT NOT NULL COMMENT '教师ID',
+    type ENUM('paper', 'project', 'teaching', 'guidance') NOT NULL COMMENT '业绩类型',
+    description VARCHAR(500) COMMENT '业绩描述',
+    related_id INT COMMENT '关联ID（如论文ID、项目ID等）',
+    record_date DATE COMMENT '记录日期',
+    FOREIGN KEY (teacher_id) REFERENCES teachers(teacher_id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='业绩记录表';
+
+-- =====================================================
+-- 10. 竞赛获奖表 (competition_awards)
+-- =====================================================
+CREATE TABLE competition_awards (
+    award_id INT AUTO_INCREMENT PRIMARY KEY COMMENT '获奖ID',
+    teacher_id INT COMMENT '获奖教师（或指导教师）',
+    award_name VARCHAR(200) NOT NULL COMMENT '获奖名称',
+    level VARCHAR(50) COMMENT '级别（国家级/省级等）',
+    grade VARCHAR(50) COMMENT '等级（一等奖/二等奖等）',
+    award_date DATE COMMENT '获奖日期',
+    issuing_unit VARCHAR(200) COMMENT '颁发单位',
+    type VARCHAR(50) COMMENT '竞赛类型（蓝桥杯国赛/省赛等）',
+    description TEXT COMMENT '备注',
+    FOREIGN KEY (teacher_id) REFERENCES teachers(teacher_id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='竞赛获奖表';
+
+-- =====================================================
+-- 11. 大创项目表 (innovation_projects)
+-- =====================================================
+CREATE TABLE innovation_projects (
+    project_id INT AUTO_INCREMENT PRIMARY KEY COMMENT '项目ID',
+    project_name VARCHAR(200) NOT NULL COMMENT '项目名称',
+    student_leader VARCHAR(100) COMMENT '学生负责人姓名',
+    student_members TEXT COMMENT '成员姓名列表',
+    advisor_id INT COMMENT '指导教师ID',
+    level VARCHAR(50) COMMENT '级别（国家级/省级等）',
+    start_date DATE COMMENT '开始日期',
+    end_date DATE COMMENT '结束日期',
+    funding DECIMAL(10,2) COMMENT '经费',
+    description TEXT COMMENT '项目描述',
+    FOREIGN KEY (advisor_id) REFERENCES teachers(teacher_id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='大创项目表';
+
+-- =====================================================
+-- 12. 教研奖励表 (teaching_awards)
+-- =====================================================
+CREATE TABLE teaching_awards (
+    award_id INT AUTO_INCREMENT PRIMARY KEY COMMENT '奖励ID',
+    teacher_id INT COMMENT '获奖教师ID',
+    award_name VARCHAR(200) NOT NULL COMMENT '奖励名称',
+    level VARCHAR(50) COMMENT '级别',
+    grade VARCHAR(50) COMMENT '等级',
+    award_date DATE COMMENT '获奖日期',
+    issuing_unit VARCHAR(200) COMMENT '颁发单位',
+    description TEXT COMMENT '备注',
+    FOREIGN KEY (teacher_id) REFERENCES teachers(teacher_id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='教研奖励表';
+
+-- =====================================================
+-- 13. 荣誉称号表 (honors)
+-- =====================================================
+CREATE TABLE honors (
+    honor_id INT AUTO_INCREMENT PRIMARY KEY COMMENT '荣誉ID',
+    teacher_id INT COMMENT '教师ID',
+    honor_name VARCHAR(200) NOT NULL COMMENT '荣誉名称',
+    grant_unit VARCHAR(200) COMMENT '授予单位',
+    grant_date DATE COMMENT '授予日期',
+    level VARCHAR(50) COMMENT '级别',
+    description TEXT COMMENT '备注',
+    FOREIGN KEY (teacher_id) REFERENCES teachers(teacher_id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='荣誉称号表';
+
+-- =====================================================
+-- 14. 留学访学表 (overseas_studies)
+-- =====================================================
+CREATE TABLE overseas_studies (
+    study_id INT AUTO_INCREMENT PRIMARY KEY COMMENT '访学ID',
+    teacher_id INT COMMENT '教师ID',
+    country VARCHAR(100) COMMENT '国家',
+    institution VARCHAR(200) COMMENT '机构',
+    start_date DATE COMMENT '开始日期',
+    end_date DATE COMMENT '结束日期',
+    description TEXT COMMENT '备注',
+    FOREIGN KEY (teacher_id) REFERENCES teachers(teacher_id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='留学访学表';
+
+-- =====================================================
+-- 15. 历年考核结果表 (performance_assessment)
+-- =====================================================
+CREATE TABLE performance_assessment (
+    assessment_id INT AUTO_INCREMENT PRIMARY KEY COMMENT '考核ID',
+    teacher_id INT NOT NULL COMMENT '教师ID',
+    year YEAR NOT NULL COMMENT '考核年份',
+    result VARCHAR(50) COMMENT '考核结果（优秀/合格等）',
+    remarks TEXT COMMENT '备注',
+    FOREIGN KEY (teacher_id) REFERENCES teachers(teacher_id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='历年考核结果表';
+
+-- =====================================================
+-- 16. 特聘教师表 (distinguished_appointments)
+-- =====================================================
+CREATE TABLE distinguished_appointments (
+    appointment_id INT AUTO_INCREMENT PRIMARY KEY COMMENT '聘任ID',
+    teacher_id INT COMMENT '教师ID',
+    distinguished_level VARCHAR(100) COMMENT '特聘层次',
+    contract_date DATE COMMENT '合同日期',
+    contract_file VARCHAR(500) COMMENT '合同文件路径',
+    start_date DATE COMMENT '聘任开始日期',
+    end_date DATE COMMENT '聘任结束日期',
+    notes TEXT COMMENT '备注',
+    FOREIGN KEY (teacher_id) REFERENCES teachers(teacher_id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='特聘教师表';
